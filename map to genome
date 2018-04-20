@@ -1,0 +1,159 @@
+#!/usr/bin/env perl
+
+#
+# erv: map to genome, for SE data
+#
+
+use warnings;
+use strict;
+use File::Basename;
+use Cwd;
+use Getopt::Long;
+use File::Type;
+
+my $home = "~/scripts";
+
+
+my $cell = "sample";          # sample name
+my $workdir = ".";            # working dir "$cell"
+my $outdir = "tmp";           # dir under $cell
+
+my $stage  = 0;
+my $stage2 = 0;
+
+my $fastq;             # sequence file
+
+my $length = 40;
+my $score_offset = 33;
+my $score = 25;
+my $pat = "$~/bin/trim/illumina_adapter.txt";
+my $cat = '';
+
+
+my $test = 0;
+
+print map("\t$_", @ARGV), "\n";
+
+
+GetOptions ("test"      => \$test,
+	    "cell=s"    => \$cell,
+	    "workdir=s" => \$workdir,
+	    "outdir=s"  => \$outdir,
+
+	    "stage=i"   => \$stage,
+	    "stage2=i"  => \$stage2,
+
+	    "length=i"  => \$length,
+	    "score_offset=i"  => \$score_offset,
+	    "pat=s"     => \$pat,
+	    "cat"       => \$cat,
+	    "score=i"   => \$score,
+
+	    "fastq=s"  => \$fastq,   ### absolute path
+	    
+	    );
+die unless ($fastq && $stage > 0 && $stage2 > 0);
+
+
+my $genome = "~/genome/genome";
+
+
+### check if fastq file is zipped
+my $zipped = 0;
+my $ftype = File::Type->new->checktype_filename($fastq);
+print STDERR "$fastq: $ftype\n";
+if ($ftype =~ /zip/) {
+    $zipped = 1;
+}
+
+
+### btrim
+my $btrim = "~/bin/trim/btrim/btrim3";
+my $adaptor = "~/bin/trim/illumina_adapter.txt";
+my $btrimout = "btrim_g_se.out";
+my $btrim_cmd;
+if ($score_offset == 33) {
+    if ($zipped) {
+	$btrim_cmd = "/bin/bash -c '$btrim -l $length -w 10 -a 25 -p $adaptor -3 -P -o $btrimout -t <(gunzip -c $fastq) -C > btrim.log 2> btrim.log'";
+    } else {
+	$btrim_cmd = "/bin/bash -c '$btrim -l $length -w 10 -a 25 -p $adaptor -3 -P -o $btrimout -t <(cat $fastq) -C > btrim.log 2> btrim.log'";
+    }
+} else {
+    if ($zipped) {
+	$btrim_cmd = "/bin/bash -c '$btrim -i -l $length -w 10 -a 25 -p $adaptor -3 -P -o $btrimout -t <(gunzip -c $fastq) -C > btrim.log 2> btrim.log'";
+    } else {
+	$btrim_cmd = "/bin/bash -c '$btrim -i -l $length -w 10 -a 25 -p $adaptor -3 -P -o $btrimout -t <(cat $fastq) -C > btrim.log 2> btrim.log'";
+    }
+}
+
+
+### bwa
+my $bwa = "bra";
+my $samtools = "samtools";
+my $filter = "$~/scripts/parse_bam.pl";
+my $bwabam = "bwa.bam";
+#my $bwa_cmd = "/bin/bash -c '$bwa mem -t 8 -p $genome ${btrimout} | $samtools view -Sh -F4 - | tee >($samtools view -Shb - | $samtools sort - -o bwa_unfiltered.bam) | $filter | $samtools view -bSh - > $bwabam'";
+my $bwa_cmd = "/bin/bash -c '$bwa mem -t 8 -p $genome ${btrimout} | $samtools view -Sh -F4 - | $filter | $samtools view -bSh - > $bwabam'";
+
+
+### sort
+my $bwabam_sorted = "bwa_sorted.bam";
+my $sort_cmd = "$samtools sort $bwabam -o $bwabam_sorted";
+
+# index
+my $bamindex_cmd = "$samtools index ${bwabam_sorted}";
+
+
+### count
+my $bedtools = "~/bin/bedtools";
+my $bed = "~/genome/ERVmap_v2_all_sorted.bed";
+my $genomefile = "~/genome/GRCh38.genome_file.txt";
+my $cntfile = "herv_coverage_GRCh38_g_pe2.txt";
+my $count_cmd = "$bedtools coverage -b ${bwabam_sorted} -a $bed -counts -sorted -g $genomefile > $cntfile";
+
+
+
+
+
+
+chdir($workdir);
+my $wdir = "$cell";	
+my $cmd = "mkdir -p $wdir";
+&cmd($cmd);
+chdir($wdir);
+
+
+
+
+# btrim
+if ($stage <= 1 && $stage2 >= 1) {
+    &cmd($btrim_cmd);
+}
+
+# bwa
+if ($stage <= 2 && $stage2 >= 2) {
+    &cmd($bwa_cmd);
+    unlink($btrimout) if (-s $bwabam > 10);
+}
+
+
+# sort
+if ($stage <= 3 && $stage2 >= 3) {
+    &cmd($sort_cmd);
+    &cmd($bamindex_cmd);
+    unlink($bwabam);
+}
+
+# count
+if ($stage <= 4 && $stage2 >= 4) {
+    &cmd($count_cmd);
+}
+
+
+sub cmd {
+    my ($c, ) = @_;
+
+    print "In ", cwd(), ":\n";
+    print "$c\n";
+    system($c) unless ($test);
+}
