@@ -8,7 +8,7 @@ use warnings;
 use strict;
 use File::Basename;
 use Cwd;
-#use File::Type;
+use File::Type;
 use Getopt::Long;
 use Pod::Usage;
 
