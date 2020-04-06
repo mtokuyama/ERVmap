@@ -24,6 +24,7 @@ trim (http://graphics.med.yale.edu/trim/)
 erv_genome.pl
 interleaved.pl
 run_clean_htseq.pl
+clean_htseq.pl
 merge_count.pl
 normalize_with_file.pl
 normalize_deseq.r
