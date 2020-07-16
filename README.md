@@ -18,6 +18,10 @@ tophat-2.1.1.Linux_x86_64
 tophat2
 trim (http://graphics.med.yale.edu/trim/)
 ```
+### Install Perl modules (if needed)
+```
+File::Type (https://metacpan.org/pod/File::Type)
+```
 
 ### Install .pl and r files
 ```
