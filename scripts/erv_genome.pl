@@ -16,9 +16,11 @@ use Pod::Usage;
 
 my $help = 0;
 my $man = 0;
-my ($btrim, $aligner, $bwa, $samtools, $filter, $bedtools,);
 my ($genome, $genome_Bowtie2, $bed, $genomefile, $gtf, $transcriptome, $adaptor, );
+my ($btrim, $aligner, $bwa, $samtools, $bedtools, $filter, );
 
+my %defaults = ("btrim" => "btrim", "aligner" => "tophat2", "bwa" => "bwa",
+	"samtools" => "samtools", "bedtools" => "bedtools", );
 
 my $cell = "sample";          # sample name
 my $workdir = ".";            # working dir "$cell"
@@ -48,8 +50,8 @@ GetOptions (
     "workdir=s" => \$workdir,
     "outdir=s"  => \$outdir,
 
-    "stage=i"   => \$stage,
-    "stage2=i"  => \$stage2,
+    "start_stage=i"   => \$stage,
+    "end_stage=i"  => \$stage2,
 
     "length=i"  => \$length,
     "score_offset=i"  => \$score_offset,
@@ -80,11 +82,45 @@ GetOptions (
 pod2usage(1) if $help;
 pod2usage(2) if $man;
 
-pod2usage(1) unless ($btrim && $aligner && $bwa && $samtools && $filter && $bedtools);
-pod2usage(1) unless (-x $btrim && -x $aligner && -x $bwa && -x $samtools && -x $filter && -x $bedtools);
-pod2usage(1) unless (-e $genome && -e $genome_Bowtie2 && -e $bed && -e $genomefile && -e $gtf && -e $transcriptome && -e $adaptor); 
+###checking specified arguments and error checking
+my %dependencies = ("btrim" => \$btrim, "aligner" => \$aligner, "bwa" => \$bwa, 
+		"samtools" => \$samtools, "bedtools" => \$bedtools); 
+my %references = ("genome" => $genome . (defined $genome ? ".fa" : ''), "genome_Bowtie2" => $genome_Bowtie2 . (defined $genome_Bowtie2 ? ".fa" : ''), "bed" => $bed, #note concatentaion of .fa to genomes
+		"genomefile" => $genomefile, "gtf" => $gtf, "adaptor" => $adaptor, "fastq" => $fastq, "filter" => $filter);
+my $failed = 0;
 
-pod2usage(1) unless ($fastq && $stage > 0 && $stage2 > 0);
+foreach my $dependency (keys %dependencies) {
+	if (!(${ $dependencies{$dependency} })){
+		${ $dependencies{$dependency} } = $defaults{$dependency} 
+	}
+	elsif (!(-x ${ $dependencies{$dependency} })){
+		print STDERR "ERROR: please verify specified --$dependency. Unable to execute ${ $dependencies{$dependency} }\n";
+		$failed = 1;
+	}
+}
+
+foreach my $reference (keys %references) {
+	if (!($references{$reference})){
+		print STDERR "ERROR: please specify --$reference\n";
+		$failed = 1;
+	}
+	elsif (!(-e $references{$reference})){
+		print STDERR "ERROR: Please verify specified --$reference. Could not find $references{$reference}\n";
+		$failed = 1;
+	}
+}
+
+if ($stage < 1 || $stage > 6 || $stage2 < 1 || $stage > $stage2){
+	print STDERR "ERROR: please ensure that --stage and --stage2 are between 1 and 6, and that --stage2 > --stage\n";
+	$failed = 1;
+}
+
+pod2usage(1) if $failed;
+#pod2usage(1) unless ($btrim && $aligner && $bwa && $samtools && $filter && $bedtools);
+#pod2usage(1) unless (-x $btrim && -x $aligner && -x $bwa && -x $samtools && -x $filter && -x $bedtools);
+#pod2usage(1) unless (-e $genome && -e $genome_Bowtie2 && -e $bed && -e $genomefile && -e $gtf && -e $transcriptome && -e $adaptor); 
+
+#pod2usage(1) unless ($fastq && $stage > 0 && $stage2 > 0);
 
 
 
@@ -102,15 +138,15 @@ my $btrimout = "btrim_g_se.out";
 my $btrim_cmd;
 if ($score_offset == 33) {
     if ($zipped) {
-	$btrim_cmd = "/bin/bash -c '$btrim -l $length -w 10 -a 25 -p $adaptor -3 -P -o $btrimout -t <(gunzip -c $fastq) -C > btrim.log 2> btrim.log'";
+	$btrim_cmd = "/bin/bash -c '$btrim -l $length -w 10 -a $score -p $adaptor -3 -P -o $btrimout -t <(gunzip -c $fastq) -C > btrim.log 2> btrim.log'";
     } else {
-	$btrim_cmd = "/bin/bash -c '$btrim -l $length -w 10 -a 25 -p $adaptor -3 -P -o $btrimout -t <(cat $fastq) -C > btrim.log 2> btrim.log'";
+	$btrim_cmd = "/bin/bash -c '$btrim -l $length -w 10 -a $score -p $adaptor -3 -P -o $btrimout -t <(cat $fastq) -C > btrim.log 2> btrim.log'";
     }
 } else {
     if ($zipped) {
-	$btrim_cmd = "/bin/bash -c '$btrim -i -l $length -w 10 -a 25 -p $adaptor -3 -P -o $btrimout -t <(gunzip -c $fastq) -C > btrim.log 2> btrim.log'";
+	$btrim_cmd = "/bin/bash -c '$btrim -i -l $length -w 10 -a $score -p $adaptor -3 -P -o $btrimout -t <(gunzip -c $fastq) -C > btrim.log 2> btrim.log'";
     } else {
-	$btrim_cmd = "/bin/bash -c '$btrim -i -l $length -w 10 -a 25 -p $adaptor -3 -P -o $btrimout -t <(cat $fastq) -C > btrim.log 2> btrim.log'";
+	$btrim_cmd = "/bin/bash -c '$btrim -i -l $length -w 10 -a $score -p $adaptor -3 -P -o $btrimout -t <(cat $fastq) -C > btrim.log 2> btrim.log'";
     }
 }
 
@@ -212,22 +248,17 @@ sub cmd {
 __END__
 =head1 NAME
 
-erv_se_genome_v2.pl - Script to run ervmap
+erv_genome.pl - Script to run ervmap
 
 =head1 SYNOPSIS
 
-erv_se_genome_v2.pl [options]
+erv_genome.pl [options]
 
    Options:
     -h, -? --help            brief help message
     -t, --test               print out commands without run
-    --btrim                  path to btrim (http://graphics.med.yale.edu/trim/)
-    --tophat                 path to tophat
-    --bwa                    path to bwa
-    --samtools               path to samtools
-    --filter                 path to filter (parse_bam.pl)
-    --bedtools               path to bedtools
 
+        ***Reference Files***
     --genome                 path to bwa human genome index
     --genome_Bowtie2         path to Bowtie2 human genome index
     --bed                    path to bed file of ERVs
@@ -235,10 +266,19 @@ erv_se_genome_v2.pl [options]
     --gtf                    path to gtf file of human gene annotation
     --transcriptome          path to known transcriptome, used by tophat2
     --adaptor                path to adaptor files, used by btrim (http://graphics.med.yale.edu/trim/)
+    --filter                 path to filter (parse_bam.pl) 
 
+        ***Dependencies (defaults use software versions in your path variable)***
+    --btrim                  path to btrim (http://graphics.med.yale.edu/trim/) [default=btrim]
+    --tophat                 path to tophat [default=tophat2]
+    --bwa                    path to bwa [default=bwa]
+    --samtools               path to samtools [default=samtools]
+    --bedtools               path to bedtools [default=bedtools]
+
+        ***Run info***
     --fastq                  fastq file
-    --stage                  start stage (see below)
-    --stage2                 end stage (see below)
+    --start_stage            start stage (see below)
+    --end_stage              end stage (see below)
 
 
     Stages:

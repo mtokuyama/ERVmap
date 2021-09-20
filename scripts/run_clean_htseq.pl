@@ -14,6 +14,7 @@ my $dir = shift;
 my $e1 = shift;
 my $e2 = shift;
 my $stop = shift;
+my $scrdir = shift;
 
 die "$e1 eq $e2" if ($e1 eq $e2);
 
@@ -27,7 +28,7 @@ my @files = split(/\n/, $out);
 for my $f (@files) {
     my $o = $f;
     $o =~ s/${e1}$/$e2/;
-    my $cmd = "clean_htseq.pl $stop $f > $o";
+    my $cmd = "$scrdir/clean_htseq.pl $stop $f > $o";
     print "$cmd\n";
     system($cmd);
 }
