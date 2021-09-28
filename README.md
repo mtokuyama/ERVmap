@@ -26,6 +26,7 @@ python 2.7.16
 R 3.6.2
 samtools 1.9
 tophat 2.1.1
+bowtie 2.4.2
 ```
 ### Install required libraries
 ```
@@ -61,7 +62,7 @@ Index files must be generated manually before the first run if not already gener
 * **Bowtie index files**: `bowtie2-build ref/Bowtie2_genome/genome.fa ref/Bowtie2_genome/genome`
 
 Transcriptome files are normally auto-generated on the first run of ERVmap. However, if ERVmap is unable to generate the transcriptome files (e.g. on a server with limited write permissions for computational nodes), the transcriptome can be manually generated with the following code after generating the Bowtie index files:
-`tophat2 -G ref/genes.gtf --transcriptome-index=genome_Bowtie2/known genome_Bowtie2/genome`
+`tophat2 -G ref/genes.gtf --transcriptome-index=Bowtie2_genome/known Bowtie2_genome/genome`
 # **Map data to human genome (hg38)**
 Running the below blocks of code in the terminal will yield raw counts for cellular genes and ERVmap loci as separate files.
 
