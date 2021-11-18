@@ -34,6 +34,10 @@ htseq 0.11.3 for Python
 File::Type 0.22 for Perl
 DESeq 1.38.0 for R (via BiocManager)
 ```
+### Install Perl modules (if needed)
+```
+File::Type (https://metacpan.org/pod/File::Type)
+```
 
 ### Install .pl and r files
 ```
